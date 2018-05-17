@@ -1,11 +1,14 @@
-import { render } from "./didact/didact";
+/** @jsx app.createElement */
+import { Didact } from "./didact/didact";
 
 const rootDom = document.getElementById("root");
+
+const app = Didact();
 
 function tick() {
     const time = new Date().toLocaleTimeString();
     const clockElement = <h1>{time}</h1>;
-    render(clockElement, rootDom as HTMLElement);
+    app.render(clockElement, rootDom as HTMLElement);
 }
 
 tick();
