@@ -1,7 +1,7 @@
-export interface DidactInstance {
+export interface DomInstance {
     dom: HTMLElement,
     element: DidactElement,
-    childInstances: DidactInstance[]
+    childInstances: DomInstance[]
 }
 
 export interface DidactElementProps {
