@@ -1,8 +1,7 @@
-import { DidactElement, DomInstance, DidactElementProps } from "./models";
 import { TEXT_NODE } from "./constants";
 
 export function importDidact() {
-    class Component {
+    abstract class Component {
         __internalInstance: DomInstance | ComponentInstance;
         state: any;
         props: any;
@@ -17,14 +16,7 @@ export function importDidact() {
             updateInstance(this.__internalInstance);
         }
 
-        render(): DidactElement {
-            return {
-                type: "",
-                props: {
-                    children: []
-                }
-            };
-        }
+        abstract render(): DidactElement
     }
 
     interface ComponentInstance {
@@ -32,6 +24,22 @@ export function importDidact() {
         element: DidactElement,
         childInstance: DomInstance | ComponentInstance,
         publicInstance: Component
+    };
+
+    interface DomInstance {
+        dom: HTMLElement,
+        element: DidactElement,
+        childInstances: (DomInstance | ComponentInstance)[]
+    }
+
+    interface DidactElementProps {
+        children: DidactElement[],
+        [propName: string]: any
+    }
+
+    interface DidactElement {
+        type: string,
+        props: DidactElementProps
     };
 
     let rootInstance = null;
@@ -82,7 +90,7 @@ export function importDidact() {
         }
     }
 
-    function reconcileChildren(instance: DomInstance, element: DidactElement) : DomInstance[] {
+    function reconcileChildren(instance: DomInstance, element: DidactElement) : (DomInstance | ComponentInstance)[] {
         const dom = instance.dom;
         const childInstances = instance.childInstances;
         const nextChildElements = element.props.children || [];
@@ -120,8 +128,8 @@ export function importDidact() {
         updateDomProperties(dom, { children: [] }, props);
 
         const childElements = props.children || [];
-        const childInstances = childElements.map(instantiateDomInstance);
-        const childDoms = childInstances.map((instance: DomInstance) => instance.dom)
+        const childInstances = childElements.map(instantiateWhatever);
+        const childDoms = childInstances.map((instance: (DomInstance | ComponentInstance)) => instance.dom)
         childDoms.forEach((childDom: HTMLElement) => dom.appendChild(childDom));
 
         const instance = { dom, element, childInstances };
@@ -137,16 +145,20 @@ export function importDidact() {
         const childInstance = instantiateWhatever(childElement);
         const dom = childInstance.dom;
 
-        Object.assign({}, { dom, element, childInstance, publicInstance });
+        Object.assign(instance, { dom, element, childInstance, publicInstance });
 
         return instance;
     }
 
     function createPublicInstance(element: DidactElement, internalInstance: ComponentInstance): Component {
         const { type, props } = element;
-        const publicInstance = new Component(props);
+        const publicInstance = unsafeCreateInstance(type, props);
         publicInstance.__internalInstance = internalInstance;
         return publicInstance;
+    }
+
+    function unsafeCreateInstance(type: any, props: DidactElementProps) : any {
+        return new type(props);
     }
 
     function updateInstance(internalInstance: DomInstance | ComponentInstance) {
