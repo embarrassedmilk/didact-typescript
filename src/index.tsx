@@ -1,8 +1,5 @@
-import { importDidact } from "./didact/didact";
-
+import * as Didact from "./didact/didact";
 /** @jsx Didact.createElement */
-
-const Didact = importDidact();
 
 const stories = [
     { name: "Didact introduction", url: "http://bit.ly/2pX7HNn" },
