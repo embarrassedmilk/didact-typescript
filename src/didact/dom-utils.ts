@@ -1,4 +1,4 @@
-import { DidactFiberElementProps, Fiber } from "./models";
+import { FiberProps, Fiber } from "./models";
 
 const isEvent = (name: string) : boolean => 
     name.startsWith("on");
@@ -6,15 +6,15 @@ const isEvent = (name: string) : boolean =>
 const isAttribute = (name: string) : boolean => 
     !isEvent(name) && name !== "children" && name !== "style";
 
-const isNew = (prev: DidactFiberElementProps, next: DidactFiberElementProps): (key: string) => boolean => 
+const isNew = (prev: FiberProps, next: FiberProps): (key: string) => boolean => 
    key => 
         prev[key] !== next[key];
 
-const isGone = (prev: DidactFiberElementProps, next: DidactFiberElementProps): (key: string) => boolean => 
+const isGone = (prev: FiberProps, next: FiberProps): (key: string) => boolean => 
     key => 
         !(key in next);
 
-export function updateDomProperties(dom: HTMLElement | Text, prevProps: DidactFiberElementProps, nextProps: DidactFiberElementProps) {
+export function updateDomProperties(dom: HTMLElement | Text, prevProps: FiberProps, nextProps: FiberProps) {
     // Remove event listeners
     Object.keys(prevProps)
         .filter(isEvent)

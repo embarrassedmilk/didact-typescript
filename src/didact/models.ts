@@ -1,6 +1,6 @@
 import { Component } from "./component";
 
-export interface DidactFiberElementProps {
+export interface FiberProps {
     children: Fiber[],
     [propName: string]: any
 }
@@ -12,9 +12,10 @@ export enum FiberTag {
 }
 
 export enum EffectTag {
-    PLACEMENT,
-    UPDATE,
-    DELETION
+    None = "None",
+    PLACEMENT = "PLACEMENT",
+    UPDATE = "UPDATE",
+    DELETION = "DELETION"
 }
 
 export class Fiber {
@@ -23,8 +24,9 @@ export class Fiber {
     }
 
     tag: FiberTag;
-    stateNode?: Component | (HTMLElement | Text) = null
-    props?: DidactFiberElementProps = null;
+    componentStateNode?: Component = null
+    domStateNode?: (HTMLElement | Text) = null
+    props?: FiberProps = null;
     alternate?: Fiber = null;
     type?: string = "";
     parent?: Fiber = null;

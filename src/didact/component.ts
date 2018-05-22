@@ -1,12 +1,12 @@
 import { scheduleUpdate } from "./fiber";
-import { Fiber, DidactFiberElementProps } from "./models";
+import { Fiber, FiberProps } from "./models";
 
 export abstract class Component {
     __fiber: Fiber;
     state: any;
-    props: DidactFiberElementProps;
+    props: FiberProps;
 
-    constructor(props: DidactFiberElementProps) {
+    constructor(props: FiberProps) {
         this.props = props;
         this.state = this.state || {};
     }
@@ -24,6 +24,6 @@ export function createInstance(fiber: Fiber): Component {
     return instance;
 }
 
-function unsafeCreateInstance(type: any, props: DidactFiberElementProps): Component {
+function unsafeCreateInstance(type: any, props: FiberProps): Component {
     return new type(props);
 }

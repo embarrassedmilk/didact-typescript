@@ -1,4 +1,4 @@
-import { Fiber, DidactFiberElementProps, FiberTag, EffectTag } from "./models";
+import { Fiber, FiberProps, FiberTag, EffectTag } from "./models";
 import { Component, createInstance } from "./component";
 import { createDomElement, updateDomProperties } from "./dom-utils";
 
@@ -30,16 +30,14 @@ class HostRootQueueItem {
     public constructor(init?: HostRootQueueItem) {
         Object.assign(this, init);
     }
-    from: FiberTag = FiberTag.HOST_ROOT;
     dom: HTMLElement = null;
-    newProps: DidactFiberElementProps = null;
+    newProps: FiberProps = null;
 }
 
 class ClassComponentQueueItem {
     public constructor(init?: ClassComponentQueueItem) {
         Object.assign(this, init);
     }
-    from: FiberTag = FiberTag.CLASS_COMPONENT;
     instance: Component = null;
     partialState: any;
 }
@@ -50,7 +48,6 @@ let pendingCommit = null;
 
 export function render(elements: Fiber[], containerDom: HTMLElement) {
     updateQueue.push(new HostRootQueueItem ({
-        from: FiberTag.HOST_ROOT,
         dom: containerDom,
         newProps: { children: elements }
     }));
@@ -59,7 +56,6 @@ export function render(elements: Fiber[], containerDom: HTMLElement) {
 
 export function scheduleUpdate(component: Component, partialState: any) {
     updateQueue.push(new ClassComponentQueueItem({
-        from: FiberTag.CLASS_COMPONENT,
         instance: component,
         partialState: partialState
     }));
@@ -95,17 +91,23 @@ function resetNextUnitOfWork() {
         update.instance.__fiber.partialState = update.partialState;
     }
 
-    const root =
-        update instanceof HostRootQueueItem
-            ? update.dom._rootContainerFiber
-            : getRoot(update.instance.__fiber);
-
-    nextUnitOfWork = new Fiber({
-        tag: FiberTag.HOST_ROOT,
-        stateNode: update instanceof HostRootQueueItem ? update.dom : root.stateNode,
-        props: update instanceof HostRootQueueItem ? update.newProps : root.props,
-        alternate: root
-    });
+    if (update instanceof HostRootQueueItem) {
+        nextUnitOfWork = new Fiber({
+            tag: FiberTag.HOST_ROOT,
+            domStateNode: update.dom,
+            props: update.newProps,
+            alternate: update.dom._rootContainerFiber
+        });
+    } else {
+        const root = getRoot(update.instance.__fiber);
+        nextUnitOfWork = new Fiber({
+            tag: FiberTag.HOST_ROOT,
+            componentStateNode: root.componentStateNode,
+            domStateNode: root.domStateNode,
+            props: root.props,
+            alternate: root
+        });
+    }
 }
 
 function getRoot(fiber: Fiber) : Fiber {
@@ -141,18 +143,18 @@ function beginWork(nextUnitOfWork: Fiber): void {
 }
 
 function updateHostComponent(nextUnitOfWork: Fiber): void {
-    if (!nextUnitOfWork.stateNode) {
-        nextUnitOfWork.stateNode = createDomElement(nextUnitOfWork);
+    if (!nextUnitOfWork.domStateNode) {
+        nextUnitOfWork.domStateNode = createDomElement(nextUnitOfWork);
     }
     const newChildElements = nextUnitOfWork.props.children;
     reconcileChildrenArray(nextUnitOfWork, newChildElements);
 }
 
 function updateClassComponent(nextUnitOfWork: Fiber): void {
-    let instance = nextUnitOfWork.stateNode as Component;
+    let instance = nextUnitOfWork.componentStateNode;
     if (instance == null) {
         // Call class constructor
-        instance = nextUnitOfWork.stateNode = createInstance(nextUnitOfWork);
+        instance = nextUnitOfWork.componentStateNode = createInstance(nextUnitOfWork);
     } else if (nextUnitOfWork.props === instance.props && !nextUnitOfWork.partialState) {
         // No need to render, clone children from last time
         cloneChildFibers(nextUnitOfWork);
@@ -163,7 +165,7 @@ function updateClassComponent(nextUnitOfWork: Fiber): void {
     instance.state = Object.assign({}, instance.state, nextUnitOfWork.partialState);
     nextUnitOfWork.partialState = null;
 
-    const newChildElements = (nextUnitOfWork.stateNode as Component).render();
+    const newChildElements = nextUnitOfWork.componentStateNode.render();
     reconcileChildrenArray(nextUnitOfWork, newChildElements);
 }
 
@@ -187,7 +189,8 @@ function reconcileChildrenArray(nextUnitOfWork: Fiber, children: Fiber[]) : void
             newFiber = new Fiber({
                 type: oldFiber.type,
                 tag: oldFiber.tag,
-                stateNode: oldFiber.stateNode,
+                domStateNode: oldFiber.domStateNode,
+                componentStateNode: oldFiber.componentStateNode,
                 props: element.props,
                 parent: nextUnitOfWork,
                 alternate: oldFiber,
@@ -239,7 +242,8 @@ function cloneChildFibers(parentFiber: Fiber): void {
         const newChild : Fiber = new Fiber({
             type: oldChild.type,
             tag: oldChild.tag,
-            stateNode: oldChild.stateNode,
+            domStateNode: oldChild.domStateNode,
+            componentStateNode: oldChild.componentStateNode,
             props: oldChild.props,
             partialState: oldChild.partialState,
             alternate: oldChild,
@@ -257,7 +261,7 @@ function cloneChildFibers(parentFiber: Fiber): void {
 
 function completeWork(fiber: Fiber): void {
     if (fiber.tag === FiberTag.CLASS_COMPONENT) {
-        (fiber.stateNode as Component).__fiber = fiber;
+        fiber.componentStateNode.__fiber = fiber;
     }
     if (fiber.parent) {
         const childEffects = fiber.effects || [];
@@ -272,25 +276,25 @@ function completeWork(fiber: Fiber): void {
 
 function commitAllWork(fiber: Fiber): void {
     fiber.effects.forEach(commitWork);
-    (fiber.stateNode as HTMLElement)._rootContainerFiber = fiber;
+    (fiber.domStateNode as HTMLElement)._rootContainerFiber = fiber;
     nextUnitOfWork = null;
     pendingCommit = null;
 }
 
 function commitWork(fiber: Fiber): void {
-    if (fiber.tag == FiberTag.HOST_ROOT) {
+    if (fiber.tag === FiberTag.HOST_ROOT) {
         return;
     }
     let domParentFiber = fiber.parent;
     while (domParentFiber.tag === FiberTag.CLASS_COMPONENT) {
         domParentFiber = domParentFiber.parent;
     }
-    const domParent = domParentFiber.stateNode;
+    const domParent = domParentFiber.domStateNode;
 
-    if (fiber.effectTag === EffectTag.PLACEMENT && fiber.tag == FiberTag.HOST_COMPONENT) {
-        (domParent as HTMLElement).appendChild(fiber.stateNode as HTMLElement);
+    if (fiber.effectTag === EffectTag.PLACEMENT && fiber.tag === FiberTag.HOST_COMPONENT) {
+        (domParent as HTMLElement).appendChild(fiber.domStateNode as HTMLElement);
     } else if (fiber.effectTag === EffectTag.UPDATE) {
-        updateDomProperties(fiber.stateNode as HTMLElement | Text, fiber.alternate.props, fiber.props);
+        updateDomProperties(fiber.domStateNode, fiber.alternate.props, fiber.props);
     } else if (fiber.effectTag === EffectTag.DELETION) {
         commitDeletion(fiber, domParent as HTMLElement);
     }
@@ -303,7 +307,7 @@ function commitDeletion(fiber : Fiber, domParent: HTMLElement) {
             node = node.child;
             continue;
         }
-        domParent.removeChild(node.stateNode as HTMLElement | Text);
+        domParent.removeChild(node.domStateNode);
         while (node !== fiber && !node.sibling) {
             node = node.parent;
         }
